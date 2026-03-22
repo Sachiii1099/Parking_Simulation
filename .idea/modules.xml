@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Parking_Allocation.iml" filepath="$PROJECT_DIR$/Parking_Allocation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Parking_Simulation.iml" filepath="$PROJECT_DIR$/Parking_Simulation.iml" />
     </modules>
   </component>
 </project>
