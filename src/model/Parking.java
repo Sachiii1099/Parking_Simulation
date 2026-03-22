@@ -1,6 +1,7 @@
 package model;
 
 import model.enums.CellType;
+import model.enums.VehicleSize;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,19 +12,16 @@ public class Parking {
     private int cols;
     private List<Cell> gates;
 
-    public Parking(int rows,int cols, CellType[][] layout){
+    public Parking(int rows,int cols, Cell[][] grid){
         this.rows = rows;
         this.cols=cols;
-         grid= new Cell[rows][cols];
+        this.grid=grid;
          gates=new ArrayList<>();
 
          for(int i=0;i<rows;i++){
              for(int j=0;j<cols;j++){
-                 Cell cell=new Cell(i,j,layout[i][j]);
-                 grid[i][j]=cell;
-
-                 if(layout[i][j]==CellType.GATE){
-                     gates.add(cell);
+                 if(grid[i][j].getType()==CellType.GATE){
+                     gates.add(grid[i][j]);
                  }
              }
          }
