@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Random;
 
 
-public class VehiceGeneration {
+public class VehicleGeneration {
     private Random random =new Random();
     private int vehicleCounter =0;
     private double generationProbaility=0.7;
