@@ -1,8 +1,8 @@
 package model.enums;
 
 public enum VehicleSize {
-    STANDARD(1),
-    LARGE(2);
+    STANDARD(6),
+    LARGE(7);
 
     private final int value;
     VehicleSize(int value){
