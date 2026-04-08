@@ -1,7 +1,7 @@
-package model;
+package BasicBuildingBlocks;
 
-import model.enums.VehicleType;
-import model.enums.VehicleSize;
+import BasicBuildingBlocks.enums.VehicleType;
+import BasicBuildingBlocks.enums.VehicleSize;
 
 public class Vehicle {
     private int id;

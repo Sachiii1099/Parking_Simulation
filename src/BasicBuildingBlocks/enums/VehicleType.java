@@ -1,6 +1,4 @@
-package model.enums;
-
-import model.enums.VehicleSize;
+package BasicBuildingBlocks.enums;
 
 
 public enum VehicleType {

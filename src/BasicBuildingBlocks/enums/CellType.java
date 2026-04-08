@@ -1,4 +1,4 @@
-package model.enums;
+package BasicBuildingBlocks.enums;
 
 public enum CellType {
     ROAD,

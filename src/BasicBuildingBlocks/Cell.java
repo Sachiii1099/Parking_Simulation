@@ -1,7 +1,7 @@
-package model;
-import model.enums.CellType;
-import model.enums.VehicleSize;
-import model.enums.VehicleType;
+package BasicBuildingBlocks;
+import BasicBuildingBlocks.enums.CellType;
+import BasicBuildingBlocks.enums.VehicleSize;
+import BasicBuildingBlocks.enums.VehicleType;
 
 
 public class Cell {
