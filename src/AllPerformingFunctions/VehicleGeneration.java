@@ -31,8 +31,7 @@ public class VehicleGeneration {
             return null;  // no vehicle this tick
         }
         VehicleType type = getVehicleType();
-        VehicleSize rolledSize = random.nextDouble() < 0.6 ?
-                VehicleSize.STANDARD : VehicleSize.LARGE;
+        VehicleSize rolledSize = random.nextDouble() < 0.6 ? VehicleSize.STANDARD : VehicleSize.LARGE;
         VehicleSize actualSize = type.resolveSize(rolledSize);
         Cell gate = gates.get(random.nextInt(gates.size()));
         Vehicle vehicle = new Vehicle(vehicleCounter, type, gate, actualSize);

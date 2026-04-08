@@ -2,13 +2,15 @@ package service;
 import java.util.*;
 import model.Parking;
 import model.Cell;
+import model.ParkingFloor;
 import model.enums.CellType;
 
 
 
 
 public class ParkingService {
-    public List<Cell> findPath(Parking lot,Cell start ,Cell end){
+//Ask sir about the enhancement as in this approach it computes bfs for every elemnt from gate?????
+    public List<Cell> findPath(ParkingFloor lot, Cell start , Cell end){
         boolean [][]visited =new boolean[lot.getRows()][lot.getCols()];
         Map<Cell,Cell> parent = new HashMap<>();
         Queue<Cell> queue = new LinkedList<>();
@@ -19,7 +21,6 @@ public class ParkingService {
         while(!queue.isEmpty()){
             Cell curr= queue.poll();
             if(curr==end){
-                //path recontruction;
                 return pathReconstruction(parent,start,end);
             }
             for(int i=0;i<4;i++){
