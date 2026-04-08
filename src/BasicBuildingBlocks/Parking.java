@@ -1,4 +1,4 @@
-package model;
+package BasicBuildingBlocks;
 
 import java.util.List;
 
