@@ -98,7 +98,7 @@ public class WorkingSimulation {
 
 
 
-            System.out.println("At time   " + clock + " A vec  hicleId " + car.getId() + " oftype " + car.getType() + " ofSize " + car.getSize() + " fromGate postion " + actualGate.getRow() + "," + actualGate.getCol() + " ised on Floor " + floorIndex + " atposition " + slot.getRow() + "," + slot.getCol());
+            System.out.println("At time   " + clock + " A vec hicleId " + car.getId() + " oftype " + car.getType() + " ofSize " + car.getSize() + " fromGate postion " + actualGate.getRow() + "," + actualGate.getCol() + " ised on Floor " + floorIndex + " atposition " + slot.getRow() + "," + slot.getCol());
 
         }
 
