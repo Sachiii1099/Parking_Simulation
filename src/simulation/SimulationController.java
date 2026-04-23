@@ -13,19 +13,13 @@ public class SimulationController {
     private final SlotAllocation alloc;
     private final ParkingService pathService;
 
-    // Active cars: car -> its current path (remaining cells to walk)
     private final Map<Vehicle, List<Cell>> activePaths = new LinkedHashMap<>();
-
-    // Car -> which floor it's on
     private final Map<Vehicle, Integer> carFloor = new HashMap<>();
-
-    // Car -> current cell position
     private final Map<Vehicle, Cell> carPosition = new HashMap<>();
-
-    // Car -> ticks remaining before it leaves
     private final Map<Vehicle, Integer> parkedCars = new HashMap<>();
+    private final Map<Vehicle, Integer> waitTicks = new HashMap<>();
 
-    // Reservation table: floor -> cell -> set of vehicles that reserved it this tick
+    // floor -> cell -> vehicle currently occupying it (moving cars only)
     private final Map<Integer, Map<Cell, Vehicle>> reservations = new HashMap<>();
 
     private int clock = 0;
@@ -41,25 +35,21 @@ public class SimulationController {
     public void runTick() {
         clock++;
         clearReservations();
-
-        // Step 1: Move all active cars one cell forward (collision-aware)
         moveAllCars();
-
-        // Step 2: Decrement parked car timers, remove those that leave
         tickParkedCars();
-
-        // Step 3: Spawn new vehicle
         spawnVehicle();
     }
 
+    // ─── Reservations ────────────────────────────────────────────────
+
     private void clearReservations() {
         reservations.clear();
-        // Reserve current positions of all moving cars
+        // Pre-reserve current positions of all moving cars
         for (Map.Entry<Vehicle, Cell> e : carPosition.entrySet()) {
             Vehicle car = e.getKey();
-            Cell cell = e.getValue();
-            int floor = carFloor.get(car);
-            reserveCell(floor, cell, car);
+            if (activePaths.containsKey(car)) { // only moving cars
+                reserveCell(carFloor.get(car), e.getValue(), car);
+            }
         }
     }
 
@@ -74,9 +64,11 @@ public class SimulationController {
         return owner != null && owner != requester;
     }
 
+    // ─── Movement ────────────────────────────────────────────────────
+
     private void moveAllCars() {
-        // Sort by priority: higher priority vehicles move first
         List<Vehicle> sortedCars = new ArrayList<>(activePaths.keySet());
+        // Higher priority moves first — ambulance > disabled > vip > normal
         sortedCars.sort((a, b) -> b.getType().getPriority() - a.getType().getPriority());
 
         for (Vehicle car : sortedCars) {
@@ -87,30 +79,75 @@ public class SimulationController {
             Cell nextCell = path.get(0);
 
             if (isCellReserved(floor, nextCell, car)) {
-                // Cell is taken — wait this tick (no movement)
-                System.out.println("  Car " + car.getId() + " waiting at " +
-                    carPosition.get(car).getRow() + "," + carPosition.get(car).getCol() +
-                    " (collision avoided)");
+                int waited = waitTicks.getOrDefault(car, 0) + 1;
+                waitTicks.put(car, waited);
+                System.out.println("  Car " + car.getId() + " blocked, waited " + waited + " ticks");
+
+                // After 3 ticks waiting, try to replan around blocker
+                if (waited >= 3) {
+                    waitTicks.put(car, 0);
+                    boolean replanned = replanAround(car, floor, nextCell);
+                    if (!replanned) {
+                        // Completely stuck — remove car to prevent permanent jam
+                        System.out.println("  Car " + car.getId() + " unresolvable jam — removed.");
+                        activePaths.remove(car);
+                        carPosition.remove(car);
+                        carFloor.remove(car);
+                        waitTicks.remove(car);
+                    }
+                }
                 continue;
             }
 
-            // Move to next cell
+            // Successful move
+            waitTicks.put(car, 0);
             path.remove(0);
             carPosition.put(car, nextCell);
             reserveCell(floor, nextCell, car);
 
-            // If path is empty, car has reached its slot
+            // Reached destination slot
             if (path.isEmpty()) {
-                Cell slot = nextCell;
-                slot.parking(car);
+                nextCell.parking(car);
                 activePaths.remove(car);
-                int stayTicks = 20 + random.nextInt(30); // 5-15 ticks
-                parkedCars.put(car, stayTicks);
-                System.out.println("  Car " + car.getId() + " parked at " +
-                    slot.getRow() + "," + slot.getCol() + " for " + stayTicks + " ticks");
+                waitTicks.remove(car);
+                int stay = 20 + random.nextInt(30);
+                parkedCars.put(car, stay);
+                System.out.println("  Car " + car.getId() + " parked at ["
+                        + nextCell.getRow() + "," + nextCell.getCol()
+                        + "] floor " + floor + " for " + stay + " ticks");
             }
         }
     }
+
+    /**
+     * Try to find an alternative path that avoids the currently blocked cell.
+     * We temporarily mark the blocker's cell as a block, replan, then restore.
+     */
+    private boolean replanAround(Vehicle car, int floor, Cell blockedCell) {
+        Cell current = carPosition.get(car);
+        List<Cell> oldPath = activePaths.get(car);
+        if (oldPath == null || oldPath.isEmpty()) return false;
+        Cell destination = oldPath.get(oldPath.size() - 1);
+
+        // Temporarily mark blocked cell as BLOCK so BFS avoids it
+        CellType original = blockedCell.getType();
+        blockedCell.setType(CellType.BLOCK);
+
+        List<Cell> newPath = pathService.findPath(parking.getFloor(floor), current, destination);
+
+        // Restore original type
+        blockedCell.setType(original);
+
+        if (newPath.size() > 1) {
+            newPath.remove(0); // remove current position
+            activePaths.put(car, newPath);
+            System.out.println("  Car " + car.getId() + " replanned, new path length: " + newPath.size());
+            return true;
+        }
+        return false;
+    }
+
+    // ─── Parked Cars ─────────────────────────────────────────────────
 
     private void tickParkedCars() {
         Iterator<Map.Entry<Vehicle, Integer>> it = parkedCars.entrySet().iterator();
@@ -120,8 +157,6 @@ public class SimulationController {
             int remaining = entry.getValue() - 1;
 
             if (remaining <= 0) {
-                // Car leaves — free its slot
-                int floor = carFloor.get(car);
                 Cell pos = carPosition.get(car);
                 if (pos != null && pos.getType() == CellType.SLOT) {
                     pos.setOccupied(false);
@@ -136,6 +171,8 @@ public class SimulationController {
         }
     }
 
+    // ─── Spawn ───────────────────────────────────────────────────────
+
     private void spawnVehicle() {
         Vehicle car = gen.vehicleGenearte(parking.getFloor(0).getGates());
         if (car == null) {
@@ -147,47 +184,94 @@ public class SimulationController {
         Cell slot = alloc.slotAllocate(parking, car, gate);
 
         if (slot == null) {
-            System.out.println("Tick " + clock + ": Car " + car.getId() +
-                " (" + car.getType() + ") arrived but no slot available.");
+            System.out.println("Tick " + clock + ": Car " + car.getId()
+                    + " (" + car.getType() + ") — no slot available.");
             return;
         }
 
-        // Find which floor the slot is on
-        int floorIndex = findFloor(slot);
-        if (floorIndex == -1) return;
+        // Find which floor the slot is on by position match (not reference)
+        int targetFloor = findFloorByPosition(slot);
+        if (targetFloor == -1) {
+            System.out.println("Tick " + clock + ": Car " + car.getId() + " — floor not found.");
+            return;
+        }
 
-        // Find path on that floor
-        Cell startCell = (floorIndex == 0) ? gate : parking.getFloor(floorIndex).getGates().get(0);
-        List<Cell> path = pathService.findPath(parking.getFloor(floorIndex), startCell, slot);
+        // Get the actual cell reference on that floor (fixes copied floor bug)
+        Cell actualSlot = parking.getFloor(targetFloor)
+                .getGrid()[slot.getRow()][slot.getCol()];
+
+        // Get start cell: floor 0 uses entry gate, upper floors use nearest gate on that floor
+        Cell startCell;
+        if (targetFloor == 0) {
+            startCell = gate;
+        } else {
+            startCell = getNearestGate(parking.getFloor(targetFloor), actualSlot);
+            if (startCell == null) {
+                System.out.println("Tick " + clock + ": Car " + car.getId()
+                        + " — no gate on floor " + targetFloor);
+                return;
+            }
+        }
+
+        List<Cell> path = pathService.findPath(
+                parking.getFloor(targetFloor), startCell, actualSlot);
 
         if (path.isEmpty()) {
-            System.out.println("Tick " + clock + ": Car " + car.getId() + " no path found.");
+            System.out.println("Tick " + clock + ": Car " + car.getId()
+                    + " — no path on floor " + targetFloor);
             return;
         }
 
-        // Remove start cell from path (car begins there)
-        path.remove(0);
+        path.remove(0); // car starts at startCell, don't re-traverse it
 
         activePaths.put(car, path);
-        carFloor.put(car, floorIndex);
+        carFloor.put(car, targetFloor);
         carPosition.put(car, startCell);
 
-        System.out.println("Tick " + clock + ": Car " + car.getId() +
-            " (" + car.getType() + ", " + car.getSize() + ")" +
-            " entering from gate " + gate.getRow() + "," + gate.getCol() +
-            " heading to slot " + slot.getRow() + "," + slot.getCol() +
-            " on floor " + floorIndex);
+        System.out.println("Tick " + clock + ": Car " + car.getId()
+                + " (" + car.getType() + ", " + car.getSize() + ")"
+                + " floor " + targetFloor
+                + " gate [" + startCell.getRow() + "," + startCell.getCol() + "]"
+                + " → slot [" + actualSlot.getRow() + "," + actualSlot.getCol() + "]");
     }
 
-    private int findFloor(Cell slot) {
+    // ─── Helpers ─────────────────────────────────────────────────────
+
+    /**
+     * Find floor by matching row/col position instead of object reference.
+     * Fixes the bug where copied floors never matched by == reference.
+     */
+    private int findFloorByPosition(Cell slot) {
         for (int f = 0; f < parking.getTotalFloors(); f++) {
-            Cell[][] grid = parking.getFloor(f).getGrid();
-            for (int i = 0; i < parking.getFloor(f).getRows(); i++)
-                for (int j = 0; j < parking.getFloor(f).getCols(); j++)
-                    if (grid[i][j] == slot) return f;
+            ParkingFloor floor = parking.getFloor(f);
+            Cell candidate = floor.getGrid()[slot.getRow()][slot.getCol()];
+            if (candidate.getType() == CellType.SLOT
+                    && candidate.getSlotSize() == slot.getSlotSize()
+                    && !candidate.isOccupied()) {
+                return f;
+            }
         }
         return -1;
     }
+
+    /**
+     * Get the gate on a given floor that is nearest (Manhattan distance) to the target slot.
+     */
+    private Cell getNearestGate(ParkingFloor floor, Cell target) {
+        Cell best = null;
+        int bestDist = Integer.MAX_VALUE;
+        for (Cell g : floor.getGates()) {
+            int dist = Math.abs(g.getRow() - target.getRow())
+                    + Math.abs(g.getCol() - target.getCol());
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = g;
+            }
+        }
+        return best;
+    }
+
+    // ─── Getters ─────────────────────────────────────────────────────
 
     public int getClock() { return clock; }
     public Parking getParking() { return parking; }
