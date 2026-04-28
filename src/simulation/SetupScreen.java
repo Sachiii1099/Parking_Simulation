@@ -2,11 +2,9 @@ package simulation;
 
 import BasicBuildingBlocks.*;
 import BasicBuildingBlocks.enums.*;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
+import javafx.geometry.*;
 import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.canvas.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -19,160 +17,243 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class SetupScreen {
 
-    private static final int CELL = 50;
+    private static final int CELL = 52;
 
-    private int rows, cols, numFloors;
-    private int currentFloor = 0;
-    private CellType selectedType = CellType.ROAD;
-    private VehicleSize selectedSize = VehicleSize.STANDARD;
+                private int rows, cols, numFloors;
+    private int editingFloor = 0;
 
-    // [floor][row][col]
-    private CellType[][][] typeGrid;
-    private VehicleSize[][][] sizeGrid;
 
-    private Canvas canvas;
+
+                        private CellType   selectedType = CellType.ROAD;
+                        private VehicleSize selectedSize = VehicleSize.STANDARD;
+
+                        private CellType[][][]   typeGrid;
+                        private VehicleSize[][][] sizeGrid;
+
+    private Canvas          canvas;
     private GraphicsContext gc;
-    private Stage stage;
+                    private Stage           stage;
+    private Label           selectedLabel;
+
+
 
     public void show(Stage stage) {
         this.stage = stage;
 
-        // --- Input screen ---
-        VBox inputBox = new VBox(12);
-        inputBox.setPadding(new Insets(30));
-        inputBox.setStyle("-fx-background-color: #1e1e1e;");
-        inputBox.setAlignment(Pos.CENTER);
+        VBox root = new VBox(16);
+        root.setPadding(new Insets(36));
+                        root.setAlignment(Pos.CENTER);
+                        root.setStyle("-fx-background-color:#1a1a2e;");
 
-        Label title = styled("🅿 Parking Simulator Setup", 20, "#ffffff");
-        TextField rowsField = new TextField("5");
-        TextField colsField = new TextField("7");
-        TextField floorsField = new TextField("1");
 
-        styleField(rowsField, "Rows");
-        styleField(colsField, "Cols");
-        styleField(floorsField, "Floors");
 
-        Button startBtn = new Button("Build Layout ▶");
-        startBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size:14px; -fx-padding: 8 20;");
 
-        startBtn.setOnAction(e -> {
+                Label title = new Label("🅿  Parking Simulator");
+                             title.setStyle("-fx-text-fill:white;-fx-font-size:22px;-fx-font-weight:bold;");
+
+                TextField rowsF   = field("5");
+
+                        TextField colsF   = field("8");
+                TextField floorsF = field("1");
+
+                Button go = new Button("Build Layout  ");
+        go.setStyle("-fx-background-color:#4CAF50;-fx-text-fill:white;"
+
+                + "-fx-font-size:14px;-fx-padding:8 24;");
+
+        go.setOnAction(e -> {
             try {
-                rows = Integer.parseInt(rowsField.getText().trim());
-                cols = Integer.parseInt(colsField.getText().trim());
-                numFloors = Integer.parseInt(floorsField.getText().trim());
-                if (rows < 2 || cols < 2 || numFloors < 1) throw new Exception();
+                          rows      = Math.max(2, Integer.parseInt(rowsF.getText().trim()));
+                     cols      = Math.max(2, Integer.parseInt(colsF.getText().trim()));
+                                numFloors = Math.max(1, Integer.parseInt(floorsF.getText().trim()));
                 initGrids();
+
                 showEditor();
-            } catch (Exception ex) {
-                showAlert("Please enter valid numbers (rows/cols >= 2, floors >= 1)");
+
+
+            } catch (NumberFormatException ex) {
+
+                     alert("Enter valid integers for rows, columns and floors.");
             }
         });
 
-        inputBox.getChildren().addAll(title,
-                labeled("Number of Rows:", rowsField),
-                labeled("Number of Columns:", colsField),
-                labeled("Number of Floors:", floorsField),
-                startBtn);
+        root.getChildren().addAll(
+                title,
 
-        stage.setScene(new Scene(inputBox, 400, 320));
-        stage.setTitle("Parking Simulator - Setup");
+                row("Rows :", rowsF),
+
+                    row("Columns :", colsF),
+                    row("Floors :", floorsF),
+                go);
+
+        stage.setScene(new Scene(root, 380, 300));
+
+            stage.setTitle("Setup");
         stage.show();
     }
 
+
+
     private void initGrids() {
         typeGrid = new CellType[numFloors][rows][cols];
+
         sizeGrid = new VehicleSize[numFloors][rows][cols];
         for (int f = 0; f < numFloors; f++)
             for (int i = 0; i < rows; i++)
+
                 for (int j = 0; j < cols; j++) {
                     typeGrid[f][i][j] = CellType.ROAD;
+
                     sizeGrid[f][i][j] = VehicleSize.STANDARD;
                 }
     }
 
     private void showEditor() {
         BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #1e1e1e;");
 
-        // --- Toolbar top ---
-        HBox toolbar = buildToolbar();
-        root.setTop(toolbar);
+             root.setStyle("-fx-background-color:#1a1a2e;");
 
-        // --- Canvas center ---
-        canvas = new Canvas(cols * CELL + 2, rows * CELL + 2);
-        gc = canvas.getGraphicsContext2D();
-        drawGrid();
+                root.setTop(buildToolbar());
 
-        canvas.setOnMouseClicked(e -> {
-            int col = (int)(e.getX() / CELL);
-            int row = (int)(e.getY() / CELL);
-            if (row >= 0 && row < rows && col >= 0 && col < cols) {
-                typeGrid[currentFloor][row][col] = selectedType;
-                sizeGrid[currentFloor][row][col] = selectedSize;
-                drawGrid();
-            }
-        });
+                            canvas = new Canvas(cols * CELL + 4, rows * CELL + 4);
 
-        // Also support drag-painting
-        canvas.setOnMouseDragged(e -> {
-            int col = (int)(e.getX() / CELL);
-            int row = (int)(e.getY() / CELL);
-            if (row >= 0 && row < rows && col >= 0 && col < cols) {
-                typeGrid[currentFloor][row][col] = selectedType;
-                sizeGrid[currentFloor][row][col] = selectedSize;
-                drawGrid();
-            }
-        });
+                            gc     = canvas.getGraphicsContext2D();
 
-        ScrollPane scroll = new ScrollPane(canvas);
-        scroll.setStyle("-fx-background: #1e1e1e; -fx-background-color: #1e1e1e;");
-        root.setCenter(scroll);
+                            drawGrid();
 
-        // --- Bottom bar ---
-        HBox bottomBar = buildBottomBar();
-        root.setBottom(bottomBar);
+                            canvas.setOnMousePressed(e  -> paint(e.getX(), e.getY()));
 
-        Scene scene = new Scene(root, Math.min(cols * CELL + 300, 1000), rows * CELL + 160);
-        stage.setScene(scene);
-        stage.setTitle("Floor " + currentFloor + " Editor");
+
+                    canvas.setOnMouseDragged(e  -> paint(e.getX(), e.getY()));
+
+        ScrollPane sp = new ScrollPane(canvas);
+
+
+                     sp.setStyle("-fx-background:#1a1a2e;-fx-background-color:#1a1a2e;");
+
+
+
+        root.setCenter(sp);
+
+
+
+        root.setBottom(buildBottomBar());
+
+        double w = Math.min(cols * CELL + 340, 1100);
+
+                         double h = Math.min(rows * CELL + 180, 780);
+
+
+
+
+
+
+        stage.setScene(new Scene(root, w, h));
+
+
+                  stage.setTitle("Floor " + editingFloor + " — Editor");
     }
 
+    private void paint(double mx, double my) {
+
+
+           int c = (int)(mx / CELL);
+
+
+        int r = (int)(my / CELL);
+                        if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+
+
+
+                        typeGrid[editingFloor][r][c] = selectedType;
+
+
+
+        sizeGrid[editingFloor][r][c] = selectedSize;
+
+
+        drawGrid();
+    }
+
+
+
     private HBox buildToolbar() {
-        HBox bar = new HBox(8);
-        bar.setPadding(new Insets(10));
-        bar.setStyle("-fx-background-color: #2d2d2d;");
+
+
+                    HBox bar = new HBox(8);
+
+
+                    bar.setPadding(new Insets(10));
+
+
+
         bar.setAlignment(Pos.CENTER_LEFT);
 
-        Label title = styled("Select Type:", 13, "#aaaaaa");
-        bar.getChildren().add(title);
 
-        // Cell type buttons
-        bar.getChildren().add(typeBtn("Road", CellType.ROAD, "#2d2d2d", "#888888"));
-        bar.getChildren().add(typeBtn("Slot S", CellType.SLOT, "#1a2a3a", "#64B5F6"));
-        bar.getChildren().add(typeBtn("Slot L", CellType.SLOT, "#1a3a2a", "#81C784"));
-        bar.getChildren().add(typeBtn("Gate", CellType.GATE, "#FF9800", "#ffffff"));
-        bar.getChildren().add(typeBtn("Block", CellType.BLOCK, "#555555", "#ffffff"));
-        bar.getChildren().add(typeBtn("Lift", CellType.LIFT, "#9C27B0", "#ffffff"));
+        bar.setStyle("-fx-background-color:#16213e;");
 
-        // Floor tabs if multi-floor
+        selectedLabel = new Label("Selected: ROAD");
+
+
+        selectedLabel.setStyle("-fx-text-fill:#aaa;-fx-font-size:12px;");
+
+        bar.getChildren().addAll(
+                tBtn("Road",    CellType.ROAD,  null,               "#555"),
+
+
+
+                        tBtn("Slot S",  CellType.SLOT,  VehicleSize.STANDARD,"#0d3c55"),
+
+
+
+                        tBtn("Slot L",  CellType.SLOT,  VehicleSize.LARGE,   "#1b5e20"),
+
+
+
+                        tBtn("Gate",    CellType.GATE,  null,               "#e65100"),
+
+
+
+                tBtn("Block",   CellType.BLOCK, null,               "#424242"),
+
+
+
+                tBtn("Lift",    CellType.LIFT,  null,               "#6a1b9a"),
+
+
+
+                new Separator(),
+                selectedLabel
+        );
+
+
         if (numFloors > 1) {
-            Separator sep = new Separator();
-            sep.setOrientation(javafx.geometry.Orientation.VERTICAL);
-            bar.getChildren().add(sep);
-            bar.getChildren().add(styled("Floor:", 13, "#aaaaaa"));
-            for (int f = 0; f < Math.min(numFloors, 2); f++) {
-                int fCopy = f;
-                Button fb = new Button("Floor " + f);
-                fb.setStyle("-fx-background-color: " + (f == 0 ? "#4CAF50" : "#444") + "; -fx-text-fill: white;");
+
+            bar.getChildren().add(new Separator());
+
+
+
+            for (int f = 0; f < Math.min(numFloors, 5); f++) {
+                int ff = f;
+
+
+
+                Button fb = new Button("F" + f);
+
+
+
+                         fb.setStyle("-fx-background-color:#333;-fx-text-fill:white;");
                 fb.setOnAction(e -> {
-                    currentFloor = fCopy;
+
+
+
+                               editingFloor = ff;
                     drawGrid();
-                    stage.setTitle("Floor " + currentFloor + " Editor");
+                    stage.setTitle("Floor " + ff + " — Editor");
                 });
                 bar.getChildren().add(fb);
             }
@@ -181,161 +262,215 @@ public class SetupScreen {
         return bar;
     }
 
-    private Button typeBtn(String label, CellType type, String bg, String fg) {
-        Button btn = new Button(label);
-        btn.setStyle("-fx-background-color: " + bg + "; -fx-text-fill: " + fg +
-                "; -fx-border-color: #666; -fx-border-radius: 4; -fx-background-radius: 4; -fx-padding: 5 10;");
-        btn.setOnAction(e -> {
+    private Button tBtn(String label, CellType type, VehicleSize size, String bg) {
+        Button b = new Button(label);
+        b.setStyle("-fx-background-color:" + bg
+                + ";-fx-text-fill:white;-fx-padding:5 10;"
+
+
+
+                           + "-fx-border-radius:4;-fx-background-radius:4;");
+        b.setOnAction(e -> {
             selectedType = type;
-            selectedSize = label.equals("Slot L") ? VehicleSize.LARGE : VehicleSize.STANDARD;
+            selectedSize = (size != null) ? size : VehicleSize.STANDARD;
+            selectedLabel.setText("Selected: " + label);
         });
-        return btn;
+        return b;
     }
+
+    // ─────────────────────────────────────────────
+    //  Bottom bar
+    // ─────────────────────────────────────────────
 
     private HBox buildBottomBar() {
         HBox bar = new HBox(12);
-        bar.setPadding(new Insets(10));
-        bar.setStyle("-fx-background-color: #2d2d2d;");
-        bar.setAlignment(Pos.CENTER_RIGHT);
+                        bar.setPadding(new Insets(10));
+                        bar.setAlignment(Pos.CENTER_RIGHT);
+        bar.setStyle("-fx-background-color:#16213e;");
 
-        Label hint = styled("Ground floor must have at least 1 Gate. Upper floors need Gates or Lifts.", 11, "#888888");
-        Button launchBtn = new Button("▶ Launch Simulation");
-        launchBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size:13px; -fx-padding: 7 18;");
 
-        launchBtn.setOnAction(e -> {
-            if (!validateAndLaunch()) return;
-        });
 
-        bar.getChildren().addAll(hint, launchBtn);
+
+        Label hint = new Label(
+                "Ground floor needs ≥1 Gate.  Upper floors need ≥1 Gate + roads connecting to slots.");
+        hint.setStyle("-fx-text-fill:#888;-fx-font-size:11px;");
+
+        Button launch = new Button("▶  Launch Simulation");
+                    launch.setStyle("-fx-background-color:#1565C0;-fx-text-fill:white;"
+                            + "-fx-font-size:13px;-fx-padding:7 18;");
+        launch.setOnAction(e -> launchSim());
+
+        bar.getChildren().addAll(hint, launch);
         return bar;
     }
 
-    private boolean validateAndLaunch() {
-        // Check ground floor has gate
-        boolean hasGate = false;
-        for (int i = 0; i < rows; i++)
-            for (int j = 0; j < cols; j++)
-                if (typeGrid[0][i][j] == CellType.GATE) hasGate = true;
+    // ─────────────────────────────────────────────
+    //  Validation + launch
+    // ─────────────────────────────────────────────
 
-        if (!hasGate) {
-            showAlert("Ground floor must have at least one GATE!");
-            return false;
+    private void launchSim() {
+
+        boolean hasGate = false;
+        for (int i = 0; i < rows && !hasGate; i++)
+            for (int j = 0; j < cols && !hasGate; j++)
+                if (typeGrid[0][i][j] == CellType.GATE) hasGate = true;
+        if (!hasGate) { alert("Ground floor needs at least one GATE!"); return; }
+
+        // Validate upper floors each have at least one gate
+        for (int f = 1; f < numFloors; f++) {
+            boolean ug = false;
+            for (int i = 0; i < rows && !ug; i++)
+                for (int j = 0; j < cols && !ug; j++)
+                    if (typeGrid[f][i][j] == CellType.GATE) ug = true;
+            if (!ug) {
+                alert("Floor " + f + " needs at least one GATE\n"
+                        + "(cars enter upper floors through gates).");
+                return;
+            }
         }
 
-        // Build Parking object
+        // Build Parking
         List<ParkingFloor> floors = new ArrayList<>();
-
-        // Ground floor
-        Cell[][] g0 = buildCellGrid(0);
-        floors.add(new ParkingFloor(0, rows, cols, g0));
+        floors.add(new ParkingFloor(0, rows, cols, buildGrid(0)));
 
         if (numFloors > 1) {
-            // Floor 1 custom
-            Cell[][] g1 = buildCellGrid(1);
+            Cell[][] g1 = buildGrid(1);
             floors.add(new ParkingFloor(1, rows, cols, g1));
-
-            // Remaining floors copy floor 1
-            for (int f = 2; f < numFloors; f++) {
-                floors.add(new ParkingFloor(f, rows, cols, copyLayout(g1)));
-            }
+            for (int f = 2; f < numFloors; f++)
+                floors.add(new ParkingFloor(f, rows, cols, copyGrid(g1)));
         }
 
         Parking parking = new Parking(floors);
-
-        // Launch simulation window
-        Stage simStage = new Stage();
-        SimulationApp app = new SimulationApp();
-        app.startWithParking(simStage, parking);
+        Stage simStage  = new Stage();
+        new SimulationApp().startWithParking(simStage, parking);
         stage.close();
-        return true;
     }
 
-    private Cell[][] buildCellGrid(int floor) {
-        Cell[][] grid = new Cell[rows][cols];
+    private Cell[][] buildGrid(int f) {
+        Cell[][] g = new Cell[rows][cols];
         for (int i = 0; i < rows; i++)
             for (int j = 0; j < cols; j++) {
-                CellType t = typeGrid[floor][i][j];
-                VehicleSize s = sizeGrid[floor][i][j];
-                grid[i][j] = (t == CellType.SLOT)
+                CellType    t = typeGrid[f][i][j];
+                VehicleSize s = sizeGrid[f][i][j];
+                g[i][j] = (t == CellType.SLOT)
                         ? new Cell(i, j, t, s)
                         : new Cell(i, j, t);
             }
-        return grid;
+        return g;
     }
 
-    private Cell[][] copyLayout(Cell[][] original) {
-        Cell[][] copy = new Cell[rows][cols];
+    private Cell[][] copyGrid(Cell[][] src) {
+        Cell[][] c = new Cell[rows][cols];
         for (int i = 0; i < rows; i++)
             for (int j = 0; j < cols; j++)
-                copy[i][j] = new Cell(i, j, original[i][j].getType(), original[i][j].getSlotSize());
-        return copy;
+                c[i][j] = new Cell(i, j, src[i][j].getType(), src[i][j].getSlotSize());
+        return c;
     }
 
+    // ─────────────────────────────────────────────
+    //  Grid drawing
+    // ─────────────────────────────────────────────
+
     private void drawGrid() {
-        gc.setFill(Color.web("#1e1e1e"));
+        gc.setFill(Color.web("#1a1a2e"));
         gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
-                CellType t = typeGrid[currentFloor][i][j];
-                VehicleSize s = sizeGrid[currentFloor][i][j];
+                CellType    t = typeGrid[editingFloor][i][j];
+                VehicleSize s = sizeGrid[editingFloor][i][j];
                 int x = j * CELL, y = i * CELL;
 
-                Color bg;
-                String label = "";
-                switch (t) {
-                    case ROAD:  bg = Color.web("#2d2d2d"); label = ""; break;
-                    case BLOCK: bg = Color.web("#555555"); label = "✖"; break;
-                    case GATE:  bg = Color.web("#FF9800"); label = "G"; break;
-                    case LIFT:  bg = Color.web("#9C27B0"); label = "L"; break;
-                    case SLOT:
-                        bg = s == VehicleSize.LARGE ? Color.web("#1a3a2a") : Color.web("#1a2a3a");
-                        label = s == VehicleSize.LARGE ? "SL" : "SS";
-                        break;
-                    default: bg = Color.DARKGRAY; break;
-                }
+                Color  bg = cellColor(t, s);
+                String lb = cellLabel(t, s);
 
                 gc.setFill(bg);
                 gc.fillRoundRect(x + 2, y + 2, CELL - 4, CELL - 4, 8, 8);
-                gc.setStroke(Color.web("#444444"));
+                gc.setStroke(Color.web("#333"));
                 gc.setLineWidth(1);
                 gc.strokeRoundRect(x + 2, y + 2, CELL - 4, CELL - 4, 8, 8);
 
-                if (!label.isEmpty()) {
-                    gc.setFill(Color.web("#cccccc"));
-                    gc.setFont(Font.font("Arial", 10));
+                if (!lb.isEmpty()) {
+                    gc.setFill(Color.web("#dddddd"));
+                    gc.setFont(Font.font("Arial", 11));
                     gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-                    gc.fillText(label, x + CELL / 2.0, y + CELL / 2.0 + 4);
+                    gc.fillText(lb, x + CELL / 2.0, y + CELL / 2.0 + 4);
                 }
             }
         }
     }
 
-    private void showAlert(String msg) {
-        Alert alert = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
-        alert.setHeaderText(null);
-        alert.showAndWait();
+    private Color cellColor(CellType t, VehicleSize s) {
+        switch (t) {
+            case ROAD:  return Color.web("#2d2d2d");
+            case BLOCK: return Color.web("#424242");
+
+
+                    case GATE:  return Color.web("#e65100");
+
+                    case LIFT:  return Color.web("#6a1b9a");
+                    case SLOT:  return s == VehicleSize.LARGE
+                    ? Color.web("#1b5e20")
+                    : Color.web("#0d3c55");
+
+
+
+                    default:    return Color.DARKGRAY;
+        }
     }
 
-    private Label styled(String text, int size, String color) {
-        Label l = new Label(text);
-        l.setStyle("-fx-text-fill: " + color + "; -fx-font-size: " + size + "px;");
-        return l;
+    private String cellLabel(CellType t, VehicleSize s) {
+        switch (t) {
+            case BLOCK: return "✖";
+                case GATE:  return "G";
+
+                    case LIFT:  return "L";
+
+
+                    case SLOT:  return s == VehicleSize.LARGE ? "SL" : "SS";
+
+
+
+                         default:    return "";
+        }
     }
 
-    private HBox labeled(String labelText, TextField field) {
-        Label l = new Label(labelText);
-        l.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 13px;");
-        field.setStyle("-fx-background-color: #2d2d2d; -fx-text-fill: white; -fx-border-color: #555; -fx-border-radius: 4;");
-        field.setPrefWidth(80);
-        HBox box = new HBox(10, l, field);
-        box.setAlignment(Pos.CENTER);
-        return box;
+
+
+    private TextField field(String def) {
+
+
+
+
+        TextField f = new TextField(def);
+                        f.setStyle("-fx-background-color:#2d2d2d;-fx-text-fill:white;"
+
+                                + "-fx-border-color:#555;-fx-border-radius:4;");
+
+
+
+                        f.setPrefWidth(70);
+                    return f;
     }
 
-    private void styleField(TextField f, String prompt) {
-        f.setPromptText(prompt);
-        f.setStyle("-fx-background-color: #2d2d2d; -fx-text-fill: white; -fx-border-color: #555;");
-        f.setPrefWidth(80);
+    private HBox row(String labelText, TextField tf) {
+            Label l = new Label(labelText);
+            l.setStyle("-fx-text-fill:#aaa;-fx-font-size:13px;");
+
+                l.setMinWidth(80);
+
+                HBox h = new HBox(10, l, tf);
+                h.setAlignment(Pos.CENTER);
+
+
+                return h;
+    }
+
+    private void alert(String msg) {
+        Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
+
+
+             a.setHeaderText(null);
+                    a.showAndWait();
     }
 }

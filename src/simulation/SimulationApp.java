@@ -4,101 +4,126 @@ import BasicBuildingBlocks.Parking;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
 public class SimulationApp extends Application {
 
     @Override
     public void start(Stage stage) {
-        SetupScreen setup = new SetupScreen();
-        setup.show(stage);
+        new SetupScreen().show(stage);
     }
 
     public void startWithParking(Stage stage, Parking parking) {
         SimulationController controller = new SimulationController(parking);
-        GridRenderer renderer = new GridRenderer(parking, controller);
+        GridRenderer renderer           = new GridRenderer(parking, controller);
 
-        Button stepBtn = new Button("▶ Next Tick");
-        Button autoBtn = new Button("⏩ Auto Run");
-        Button stopBtn = new Button("⏹ Stop");
-        Label clockLabel = new Label("Tick: 0");
+        Button stepBtn  = new Button("▶ Next Tick");
+        Button autoBtn  = new Button("⏩ Auto Run");
+        Button stopBtn  = new Button("⏹ Stop");
+        Label  tickLbl  = new Label("Tick: 0");
+        Label  statsLbl = new Label("");
 
-        javafx.animation.Timeline timeline = new javafx.animation.Timeline(
-                new javafx.animation.KeyFrame(
-                        javafx.util.Duration.millis(800),
-                        e -> {
-                            controller.runTick();
-                            renderer.render();
-                            clockLabel.setText("Tick: " + controller.getClock());
-                        }
-                )
-        );
+                javafx.animation.Timeline timeline = new javafx.animation.Timeline(
+                        new javafx.animation.KeyFrame(
+                                javafx.util.Duration.millis(700),
+                                e -> {
+                                    controller.runTick();
+
+
+                                    renderer.render();
+                                    tickLbl.setText("Tick: " + controller.getClock());
+                                    statsLbl.setText(buildStats(controller));
+                                }
+                        )
+                );
         timeline.setCycleCount(javafx.animation.Animation.INDEFINITE);
 
         stepBtn.setOnAction(e -> {
             controller.runTick();
             renderer.render();
-            clockLabel.setText("Tick: " + controller.getClock());
+
+
+
+            tickLbl.setText("Tick: " + controller.getClock());
+            statsLbl.setText(buildStats(controller));
         });
         autoBtn.setOnAction(e -> timeline.play());
         stopBtn.setOnAction(e -> timeline.stop());
 
-        clockLabel.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
-        stepBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size:13px;");
-        autoBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size:13px;");
-        stopBtn.setStyle("-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size:13px;");
+        style(tickLbl,  "white",   14, true);
+                    style(statsLbl, "#aaaaaa", 11, false);
+                    styleBtn(stepBtn, "#4CAF50");
+                    styleBtn(autoBtn, "#2196F3");
+        styleBtn(stopBtn, "#f44336");
 
-        // Legend
-        VBox legend = buildLegend();
-
-        VBox controls = new VBox(12, clockLabel, stepBtn, autoBtn, stopBtn, legend);
+        VBox controls = new VBox(10,
+                tickLbl, stepBtn, autoBtn, stopBtn,
+                new Separator(),
+                            buildLegend(),
+                new Separator(),
+                statsLbl);
         controls.setPadding(new Insets(12));
-        controls.setStyle("-fx-background-color: #1e1e1e;");
+                        controls.setMinWidth(170);
+                        controls.setStyle("-fx-background-color: #1e1e1e;");
 
-        ScrollPane scrollPane = new ScrollPane(renderer.getCanvas());
-        scrollPane.setFitToHeight(true);
-        scrollPane.setPannable(true);
+                        ScrollPane scroll = new ScrollPane(renderer.getCanvas());
 
-        HBox root = new HBox(10, scrollPane, controls);
-        root.setStyle("-fx-background-color: #1e1e1e;");
-        root.setPadding(new Insets(10));
 
-        Scene scene = new Scene(root);
+                        scroll.setStyle("-fx-background:#1e1e1e; -fx-background-color:#1e1e1e;");
+                        scroll.setPannable(true);
+
+                    HBox root = new HBox(10, scroll, controls);
+                    root.setStyle("-fx-background-color: #1e1e1e;");
+                    root.setPadding(new Insets(10));
+
+        stage.setScene(new Scene(root));
+
+
+
         stage.setTitle("Parking Simulation");
-        stage.setScene(scene);
         stage.show();
-
         renderer.render();
     }
 
-    private VBox buildLegend() {
-        VBox box = new VBox(6);
-        box.setPadding(new Insets(10, 0, 0, 0));
-        box.getChildren().add(legendLabel("— Legend —", "#888888"));
-        box.getChildren().add(legendLabel("🔵 Normal Car", "#2196F3"));
-        box.getChildren().add(legendLabel("🟡 VIP Car", "#FFC107"));
-        box.getChildren().add(legendLabel("🟢 Disabled Car", "#4CAF50"));
-        box.getChildren().add(legendLabel("🔴 Ambulance", "#f44336"));
-        box.getChildren().add(legendLabel("🟠 Gate", "#FF9800"));
-        box.getChildren().add(legendLabel("🟣 Lift", "#9C27B0"));
-        box.getChildren().add(legendLabel("SS = Standard Slot", "#64B5F6"));
-        box.getChildren().add(legendLabel("SL = Large Slot", "#81C784"));
-        box.getChildren().add(legendLabel("Yellow ring = Parked", "#FFF176"));
-        return box;
+    private String buildStats(SimulationController c) {
+        return "Moving cars : " + c.getCarPositions().size()
+                + "\nParked cars : " + c.getParkedCars().size();
     }
 
-    private Label legendLabel(String text, String color) {
-        Label l = new Label(text);
-        l.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 11px;");
+    private VBox buildLegend() {
+        VBox b = new VBox(5);
+        b.getChildren().add(lbl("── Legend ──", "#888888", 12, true));
+                b.getChildren().add(lbl("🔵 Normal",    "#2196F3", 11, false));
+                b.getChildren().add(lbl("🟡 VIP",       "#FFC107", 11, false));
+                            b.getChildren().add(lbl("🟢 Disabled",  "#4CAF50", 11, false));
+                            b.getChildren().add(lbl("🔴 Ambulance", "#f44336", 11, false));
+                            b.getChildren().add(lbl("🟠 Gate",      "#FF9800", 11, false));
+                b.getChildren().add(lbl("🟣 Lift",      "#9C27B0", 11, false));
+                b.getChildren().add(lbl("SS Std slot",  "#64B5F6", 11, false));
+        b.getChildren().add(lbl("SL Lrg slot",  "#81C784", 11, false));
+        b.getChildren().add(lbl("★ = Parked",   "#FFF176", 11, false));
+        return b;
+    }
+
+    private Label lbl(String t, String c, int sz, boolean bold) {
+        Label l = new Label(t);
+        l.setStyle("-fx-text-fill:" + c + ";-fx-font-size:" + sz
+                + "px;" + (bold ? "-fx-font-weight:bold;" : ""));
         return l;
     }
 
-    public static void main(String[] args) {
-        launch(args);
+    private void style(Label l, String color, int size, boolean bold) {
+        l.setStyle("-fx-text-fill:" + color + ";-fx-font-size:" + size
+                + "px;" + (bold ? "-fx-font-weight:bold;" : ""));
     }
+
+    private void styleBtn(Button b, String color) {
+        b.setStyle("-fx-background-color:" + color
+                + ";-fx-text-fill:white;-fx-font-size:13px;");
+        b.setMaxWidth(Double.MAX_VALUE);
+    }
+
+    public static void main(String[] args) { launch(args); }
 }

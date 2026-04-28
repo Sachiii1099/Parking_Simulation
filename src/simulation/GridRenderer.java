@@ -12,143 +12,214 @@ import java.util.Map;
 
 public class GridRenderer {
 
-    private static final int CELL = 60;
-    private static final int PADDING = 40;
-    private static final int FLOOR_GAP = 60;
+    private static final int CELL     = 62;
+
+            private static final int PAD      = 40;
+
+
+            private static final int FLOOR_GAP = 50;
 
     private final Parking parking;
-    private final SimulationController controller;
+
+
+    private final SimulationController ctrl;
     private final Canvas canvas;
 
-    public GridRenderer(Parking parking, SimulationController controller) {
+    public GridRenderer(Parking parking, SimulationController ctrl) {
+
+
         this.parking = parking;
-        this.controller = controller;
+
+        this.ctrl    = ctrl;
 
         int floors = parking.getTotalFloors();
-        int rows = parking.getFloor(0).getRows();
-        int cols = parking.getFloor(0).getCols();
 
-        // 🔥 HORIZONTAL layout
-        int width = floors * (cols * CELL + FLOOR_GAP) + PADDING * 2;
-        int height = rows * CELL + PADDING * 2 + 40;
+                 int rows   = parking.getFloor(0).getRows();
+         int cols   = parking.getFloor(0).getCols();
 
-        canvas = new Canvas(width, height);
+
+                    int w = floors * (cols * CELL + FLOOR_GAP) + PAD * 2;
+                    int h = rows * CELL + PAD * 2 + 30;
+                    canvas = new Canvas(w, h);
     }
 
     public Canvas getCanvas() { return canvas; }
 
     public void render() {
-        GraphicsContext gc = canvas.getGraphicsContext2D();
-        gc.setFill(Color.web("#1e1e1e"));
+            GraphicsContext gc = canvas.getGraphicsContext2D();
+
+                         gc.setFill(Color.web("#1e1e1e"));
         gc.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
-        Map<Vehicle, Cell> positions = controller.getCarPositions();
-        Map<Vehicle, Integer> floorMap = controller.getCarFloors();
+                Map<Vehicle, Cell>    positions = ctrl.getCarPositions();
 
-        int floorOffsetX = PADDING;
 
-        for (int f = 0; f < parking.getTotalFloors(); f++) {
-            ParkingFloor floor = parking.getFloor(f);
+                Map<Vehicle, Integer> floorMap  = ctrl.getCarFloors();
 
-            // Floor title
-            gc.setFill(Color.web("#888888"));
-            gc.setFont(Font.font("Arial", 13));
-            gc.fillText("── Floor " + f + " ──", floorOffsetX, PADDING - 10);
+        int offsetX = PAD;
 
-            // Draw grid
-            for (int i = 0; i < floor.getRows(); i++) {
-                for (int j = 0; j < floor.getCols(); j++) {
-                    Cell cell = floor.getGrid()[i][j];
+            for (int f = 0; f < parking.getTotalFloors(); f++) {
+                ParkingFloor floor = parking.getFloor(f);
 
-                    int x = floorOffsetX + j * CELL;
-                    int y = PADDING + i * CELL;
 
-                    drawCell(gc, cell, x, y);
-                }
+
+                    gc.setFill(Color.web("#888888"));
+
+                    gc.setFont(Font.font("Arial", 13));
+
+                        gc.setTextAlign(TextAlignment.LEFT);
+                        gc.fillText("── Floor " + f + " ──", offsetX, PAD - 12);
+
+
+                                    for (int i = 0; i < floor.getRows(); i++) {
+
+                                        for (int j = 0; j < floor.getCols(); j++) {
+
+                                            drawCell(gc,
+                                                    floor.getGrid()[i][j],
+
+
+                                                    offsetX + j * CELL,
+                                                    PAD     + i * CELL);
+                                        }
+                                    }
+
+
+                        for (Map.Entry<Vehicle, Cell> e : positions.entrySet()) {
+                            Vehicle car = e.getKey();
+                            Cell    pos = e.getValue();
+                            Integer cf  = floorMap.get(car);
+                            if (cf != null && cf == f) {
+                                drawCar(gc, car,
+                                        offsetX + pos.getCol() * CELL,
+                                        PAD     + pos.getRow() * CELL);
+                            }
+                        }
+
+            offsetX += floor.getCols() * CELL + FLOOR_GAP;
             }
-
-            // Draw cars on this floor
-            for (Map.Entry<Vehicle, Cell> entry : positions.entrySet()) {
-                Vehicle car = entry.getKey();
-                Cell pos = entry.getValue();
-
-                if (floorMap.get(car) == f) {
-                    int x = floorOffsetX + pos.getCol() * CELL;
-                    int y = PADDING + pos.getRow() * CELL;
-                    drawCar(gc, car, x, y);
-                }
-            }
-
-            // Move to next floor horizontally
-            floorOffsetX += floor.getCols() * CELL + FLOOR_GAP;
-        }
     }
 
+
+
     private void drawCell(GraphicsContext gc, Cell cell, int x, int y) {
-        Color bg;
-        String label = "";
+            Color  bg    = Color.web("#2d2d2d");
+
+            String label = "";
 
         switch (cell.getType()) {
-            case ROAD:  bg = Color.web("#2d2d2d"); break;
-            case BLOCK: bg = Color.web("#555555"); label = "✖"; break;
-            case GATE:  bg = Color.web("#FF9800"); label = "G"; break;
-            case LIFT:  bg = Color.web("#9C27B0"); label = "L"; break;
-            case SLOT:
-                if (cell.isOccupied()) {
-                    bg = Color.web("#37474f");
-                } else {
-                    bg = cell.getSlotSize() == VehicleSize.LARGE
-                            ? Color.web("#1a3a2a") : Color.web("#1a2a3a");
-                    label = cell.getSlotSize() == VehicleSize.LARGE ? "SL" : "SS";
-                }
+            case ROAD:
+                bg = Color.web("#2d2d2d");
+
                 break;
-            default: bg = Color.DARKGRAY;
+
+            case BLOCK:
+                bg = Color.web("#4a4a4a");
+                label = "✖";
+
+                break;
+                 case GATE:
+                        bg = Color.web("#e65100");
+                        label = "G";
+                break;
+                case LIFT:
+                    bg = Color.web("#6a1b9a");
+                    label = "L";
+
+                        break;
+                case SLOT:
+                    if (cell.isOccupied()) {
+                        bg = Color.web("#263238");
+
+                    } else {
+                        bg = cell.getSlotSize() == VehicleSize.LARGE
+                                ? Color.web("#1b5e20")
+
+                                : Color.web("#0d3c55");
+
+                        label = cell.getSlotSize() == VehicleSize.LARGE ? "SL" : "SS";
+                    }
+                    break;
         }
 
-        gc.setFill(bg);
-        gc.fillRoundRect(x + 2, y + 2, CELL - 4, CELL - 4, 8, 8);
-        gc.setStroke(Color.web("#444444"));
-        gc.setLineWidth(1);
-        gc.strokeRoundRect(x + 2, y + 2, CELL - 4, CELL - 4, 8, 8);
+
+            gc.setFill(bg);
+
+            gc.fillRoundRect(x + 2, y + 2, CELL - 4, CELL - 4, 8, 8);
+
+
+                gc.setStroke(Color.web("#333333"));
+
+                gc.setLineWidth(1);
+
+                gc.strokeRoundRect(x + 2, y + 2, CELL - 4, CELL - 4, 8, 8);
+
 
         if (!label.isEmpty()) {
             gc.setFill(Color.web("#aaaaaa"));
-            gc.setFont(Font.font("Arial", 10));
+
+                       gc.setFont(Font.font("Arial", 10));
+
             gc.setTextAlign(TextAlignment.CENTER);
-            gc.fillText(label, x + CELL / 2.0, y + CELL / 2.0 + 4);
+               gc.fillText(label, x + CELL / 2.0, y + CELL / 2.0 + 4);
         }
     }
+
+
 
     private void drawCar(GraphicsContext gc, Vehicle car, int x, int y) {
-        Color color = getCarColor(car);
-        boolean isParked = controller.getParkedCars().containsKey(car);
+        boolean isParked = ctrl.getParkedCars().containsKey(car);
+        Color   color    = carColor(car);
+
+
+        gc.setFill(Color.rgb(0, 0, 0, 0.35));
+        gc.fillRoundRect(x + 11, y + 11, CELL - 18, CELL - 18, 9, 9);
+
 
         gc.setFill(color);
-        gc.fillRoundRect(x + 8, y + 8, CELL - 16, CELL - 16, 10, 10);
+        gc.fillRoundRect(x + 9, y + 9, CELL - 18, CELL - 18, 9, 9);
+
 
         if (isParked) {
-            gc.setStroke(Color.YELLOW);
+            gc.setStroke(Color.web("#FFD600"));
             gc.setLineWidth(2.5);
-            gc.strokeRoundRect(x + 8, y + 8, CELL - 16, CELL - 16, 10, 10);
+            gc.strokeRoundRect(x + 9, y + 9, CELL - 18, CELL - 18, 9, 9);
         }
+
 
         gc.setFill(Color.WHITE);
-        gc.setFont(Font.font("Arial Bold", 10));
-        gc.setTextAlign(TextAlignment.CENTER);
-        gc.fillText("#" + car.getId(), x + CELL / 2.0, y + CELL / 2.0 - 2);
 
-        gc.setFont(Font.font("Arial", 9));
-        gc.setFill(Color.web("#eeeeee"));
-        gc.fillText(car.getType().name().substring(0, 3), x + CELL / 2.0, y + CELL / 2.0 + 9);
+        gc.setFont(Font.font("Arial Bold", 10));
+
+                         gc.setTextAlign(TextAlignment.CENTER);
+        gc.fillText("#" + car.getId(),
+                x + CELL / 2.0,
+                y + CELL / 2.0 - 3);
+
+            gc.setFont(Font.font("Arial", 8));
+
+            gc.setFill(Color.web("#eeeeee"));
+
+        gc.fillText(car.getType().name().substring(0, 3).toUpperCase(),
+                x + CELL / 2.0,
+                y + CELL / 2.0 + 8);
     }
 
-    private Color getCarColor(Vehicle car) {
-        switch (car.getType()) {
-            case NORMAL:    return Color.web("#2196F3");
-            case VIP:       return Color.web("#FFC107");
-            case DISABLED:  return Color.web("#4CAF50");
-            case AMBULANCE: return Color.web("#f44336");
-            default:        return Color.GRAY;
-        }
+    private Color carColor(Vehicle car) {
+            switch (car.getType()) {
+                case NORMAL:    return Color.web("#1565C0");
+
+
+                        case VIP:       return Color.web("#F9A825");
+
+                        case DISABLED:  return Color.web("#2E7D32");
+
+                case AMBULANCE: return Color.web("#B71C1C");
+
+
+
+
+                default:        return Color.GRAY;
+            }
     }
 }
